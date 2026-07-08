@@ -19,6 +19,7 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  Sun,
   Moon,
   Search,
   Filter
