@@ -10,7 +10,9 @@ export const ExcelUploader = ({
   wfpFileName,
   budgetFileName,
   wfpCount,
-  budgetCount
+  budgetCount,
+  onSaveWfpToDb,
+  onSaveBudgetToDb
 }) => {
   const [loadingType, setLoadingType] = useState(null); // 'wfp' | 'budget' | null
   const [errors, setErrors] = useState({ wfp: null, budget: null });
@@ -141,6 +143,15 @@ export const ExcelUploader = ({
                   Choose WFP File
                 </button>
               )}
+              {wfpFileName && onSaveWfpToDb && (
+                <button 
+                  type="button" 
+                  onClick={(e) => { e.stopPropagation(); onSaveWfpToDb(); }}
+                  className="px-3.5 py-1.5 mt-2 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm w-full"
+                >
+                  Save WFP to Database
+                </button>
+              )}
             </div>
           </div>
 
@@ -197,6 +208,15 @@ export const ExcelUploader = ({
               {!budgetFileName && (
                 <button type="button" className="px-3.5 py-1.5 text-[10px] font-bold text-white bg-gov-gold text-gov-sidebar hover:bg-gov-gold/90 dark:text-white dark:bg-gov-gold dark:hover:bg-gov-gold/90 rounded-lg shadow-sm">
                   Choose Budget File
+                </button>
+              )}
+              {budgetFileName && onSaveBudgetToDb && (
+                <button 
+                  type="button" 
+                  onClick={(e) => { e.stopPropagation(); onSaveBudgetToDb(); }}
+                  className="px-3.5 py-1.5 mt-2 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm w-full"
+                >
+                  Save Budget to Database
                 </button>
               )}
             </div>
@@ -258,7 +278,7 @@ export const ExcelUploader = ({
           Importing Excel Spreadsheets Info
         </h4>
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          The dashboard allows you to import and analyze two separate systems side-by-side: WFP Activities and Budget Utilization (ledger/summary). Your uploaded files are parsed directly inside your browser and are not sent to any external server.
+          The dashboard allows you to import and analyze two separate systems side-by-side: WFP Activities and Budget Utilization (ledger/summary). Your uploaded files are parsed directly inside your browser. To persist data across sessions, click "Save to Database" after uploading.
         </p>
         <div className="bg-white dark:bg-slate-850 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 text-[10.5px] text-slate-400 dark:text-slate-500 leading-normal">
           <span className="font-semibold text-slate-500 dark:text-slate-400">Sheet Mapping Logic:</span> 

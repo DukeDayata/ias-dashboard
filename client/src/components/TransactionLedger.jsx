@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronUp, ChevronDown, Download, Printer, Search, RefreshCw, Eye } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, Printer, Search, RefreshCw, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import * as XLSX from 'xlsx';
 
-export const TransactionLedger = ({ transactions, isDarkMode }) => {
+export const TransactionLedger = ({ transactions, isDarkMode, onEditTransaction, onDeleteTransaction, onAddTransaction, userRole }) => {
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -14,33 +14,16 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
   const [filters, setFilters] = useState({
     search: '',
     type: '',
-    month: '',
-    year: '',
+    startDate: '',
+    endDate: '',
     pap: ''
   });
 
-  // Unique months from transaction dates
-  const uniqueMonths = useMemo(() => {
-    const months = new Set();
-    transactions.forEach(t => {
-      if (t.obligationDate) {
-        const parts = t.obligationDate.split(' ');
-        if (parts[0]) months.add(parts[0]);
-      }
-    });
-    
-    const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return [...months].sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
-  }, [transactions]);
-
-  // Unique years
-  const uniqueYears = useMemo(() => {
-    const years = new Set();
-    transactions.forEach(t => {
-      if (t.year) years.add(t.year);
-    });
-    return [...years].sort((a, b) => b - a);
-  }, [transactions]);
+  // Removed uniqueMonths/uniqueYears as they are replaced by Date Range
+  const handleResetFilters = () => {
+    setFilters({ search: '', type: '', startDate: '', endDate: '', pap: '' });
+    setCurrentPage(1);
+  };
 
   // Unique PAPs
   const uniquePaps = useMemo(() => {
@@ -56,13 +39,22 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
     return transactions.filter(t => {
       const matchType = !filters.type || t.type === filters.type;
       
-      let tMonth = '';
-      if (t.obligationDate) {
-        const parts = t.obligationDate.split(' ');
-        tMonth = parts[0] || '';
+      let matchDate = true;
+      if ((filters.startDate || filters.endDate) && t.obligationDate) {
+        const tDate = new Date(t.obligationDate);
+        if (!isNaN(tDate)) {
+          if (filters.startDate) {
+            matchDate = matchDate && tDate >= new Date(filters.startDate);
+          }
+          if (filters.endDate) {
+            // Include entire end date by adding 1 day or matching ignoring time
+            const eDate = new Date(filters.endDate);
+            eDate.setHours(23, 59, 59, 999);
+            matchDate = matchDate && tDate <= eDate;
+          }
+        }
       }
-      const matchMonth = !filters.month || tMonth === filters.month;
-      const matchYear = !filters.year || String(t.year) === filters.year;
+      
       const matchPap = !filters.pap || t.pap === filters.pap;
 
       const normSearch = filters.search.toLowerCase().trim();
@@ -71,7 +63,7 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
         (t.payee && t.payee.toLowerCase().includes(normSearch)) ||
         (t.particulars && t.particulars.toLowerCase().includes(normSearch));
 
-      return matchType && matchMonth && matchYear && matchPap && matchSearch;
+      return matchType && matchDate && matchPap && matchSearch;
     });
   }, [transactions, filters]);
 
@@ -139,10 +131,7 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
     return sortDirection === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />;
   };
 
-  const handleResetFilters = () => {
-    setFilters({ search: '', type: '', month: '', year: '', pap: '' });
-    setCurrentPage(1);
-  };
+
 
   const handleExportFiltered = () => {
     if (filteredData.length === 0) return;
@@ -225,11 +214,21 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
             <Search size={16} className="text-gov-blue dark:text-gov-blue-accent" />
             Filter Budget Transactions
           </h4>
-          {(filters.search || filters.type || filters.month || filters.year || filters.pap) && (
-            <button onClick={handleResetFilters} className="flex items-center gap-1 text-[11px] font-bold text-gov-red dark:text-red-400 hover:underline">
-              <RefreshCw size={10} /> Reset Filters
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {(filters.search || filters.type || filters.startDate || filters.endDate || filters.pap) && (
+              <button onClick={handleResetFilters} className="flex items-center gap-1 text-[11px] font-bold text-gov-red dark:text-red-400 hover:underline">
+                <RefreshCw size={10} /> Reset Filters
+              </button>
+            )}
+            {userRole === 'ADMIN' && (
+              <button
+                onClick={onAddTransaction}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gov-blue hover:bg-gov-blue-dark text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+              >
+                <Plus size={14} /> Add Transaction
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
@@ -245,17 +244,26 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
             />
           </div>
 
-          {/* Year */}
+          {/* Start Date */}
           <div className="flex flex-col space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Year</label>
-            <select
-              value={filters.year}
-              onChange={(e) => { setFilters(prev => ({ ...prev, year: e.target.value })); setCurrentPage(1); }}
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Start Date</label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => { setFilters(prev => ({ ...prev, startDate: e.target.value })); setCurrentPage(1); }}
               className="px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:border-gov-blue dark:focus:border-gov-blue-accent outline-none transition-all"
-            >
-              <option value="">All Years</option>
-              {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            />
+          </div>
+
+          {/* End Date */}
+          <div className="flex flex-col space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">End Date</label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => { setFilters(prev => ({ ...prev, endDate: e.target.value })); setCurrentPage(1); }}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:border-gov-blue dark:focus:border-gov-blue-accent outline-none transition-all"
+            />
           </div>
 
           {/* PAP */}
@@ -282,19 +290,6 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
               <option value="">All Types</option>
               <option value="CURRENT">Current</option>
               <option value="CONTINUING">Continuing</option>
-            </select>
-          </div>
-
-          {/* Month */}
-          <div className="flex flex-col space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Month</label>
-            <select
-              value={filters.month}
-              onChange={(e) => { setFilters(prev => ({ ...prev, month: e.target.value })); setCurrentPage(1); }}
-              className="px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:border-gov-blue dark:focus:border-gov-blue-accent outline-none transition-all"
-            >
-              <option value="">All Months</option>
-              {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -359,8 +354,8 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {currentRows.length > 0 ? (
-                currentRows.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer" onClick={() => setSelectedTx(tx)}>
+                currentRows.map((tx, index) => (
+                  <tr key={tx._id || tx.id || `tx-${index}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer" onClick={() => setSelectedTx(tx)}>
                     <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 max-w-[150px] truncate" title={tx.obligationNumber}>{tx.obligationNumber}</td>
                     <td className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">{tx.year || 'N/A'}</td>
                     <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">{tx.pap || 'N/A'}</td>
@@ -373,10 +368,28 @@ export const TransactionLedger = ({ transactions, isDarkMode }) => {
                     <td className="px-4 py-3 hidden md:table-cell max-w-sm truncate text-slate-450 dark:text-slate-500" title={tx.particulars}>{tx.particulars}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(tx.obligationAmount)}</td>
                     <td className="px-4 py-3 text-right font-bold text-gov-blue dark:text-gov-blue-accent">{formatCurrency(tx.disbursementAmount)}</td>
-                    <td className="px-4 py-3 text-center no-print" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-center no-print flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => setSelectedTx(tx)} className="p-1.5 text-gov-blue dark:text-gov-blue-accent hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg inline-flex items-center justify-center cursor-pointer">
                         <Eye size={16} />
                       </button>
+                      {userRole === 'ADMIN' && (
+                        <>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onEditTransaction(tx); }}
+                            className="p-1.5 text-slate-500 hover:text-gov-blue dark:hover:text-gov-blue-accent hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                            title="Edit Transaction"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteTransaction(tx._id); }}
+                            className="p-1.5 text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                            title="Delete Transaction"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))

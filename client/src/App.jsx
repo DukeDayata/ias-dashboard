@@ -22,20 +22,35 @@ import {
   Sun,
   Moon,
   Search,
-  Filter
+  Filter,
+  LogOut,
+  Database
 } from 'lucide-react';
+import { fetchWfpData, fetchBudgetData, saveWfpData, saveBudgetData, updateWfpActivity, deleteWfpActivity, updateBudgetTransaction, deleteBudgetTransaction, addWfpActivity, addBudgetTransaction, fetchUsers, addUser, updateUser, deleteUser } from './services/api';
+import Login from './components/Login';
 import KpiCard from './components/KpiCard';
 import DashboardCharts from './components/DashboardCharts';
 import ActivityTable from './components/ActivityTable';
 import ExcelUploader from './components/ExcelUploader';
 import UtilizationDashboard from './components/UtilizationDashboard';
 import TransactionLedger from './components/TransactionLedger';
+import EditWfpModal from './components/EditWfpModal';
+import EditTransactionModal from './components/EditTransactionModal';
+import UserManagement from './components/UserManagement';
+import UserModal from './components/UserModal';
+import AuditLogs from './components/AuditLogs';
+import UserProfile from './components/UserProfile';
+import MonthlyTimeline from './components/MonthlyTimeline';
 import { sampleWfpData, downloadExcelTemplate } from './utils/sampleData';
 import { sampleBudgetSummary, sampleBudgetTransactions } from './utils/budgetSampleData';
 import { formatCurrency, formatNumber, normalizeString, getMonthQuarter } from './utils/formatters';
 import chedIasLogo from './assets/ched-ias.png';
 
 function App() {
+  // Auth State
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('ias_user')));
+  const isAuthenticated = !!user;
+
   // Application States
   const [wfpData, setWfpData] = useState([]);
   const [wfpFileName, setWfpFileName] = useState('');
@@ -44,14 +59,28 @@ function App() {
   const [budgetTransactions, setBudgetTransactions] = useState([]);
   const [budgetFileName, setBudgetFileName] = useState('');
   const [regionalTransfers, setRegionalTransfers] = useState([]);
+  const [usersData, setUsersData] = useState([]);
 
-  const [activeTab, setActiveTab] = useState('uploader'); // Default to uploader since we start empty
+  const [activeTab, setActiveTab] = useState(() => {
+    const userRole = JSON.parse(localStorage.getItem('ias_user'))?.role;
+    return userRole === 'VIEWER' ? 'dashboard' : 'uploader';
+  });
   const [dashboardTab, setDashboardTab] = useState('wfp');
   const [checklistTab, setChecklistTab] = useState('wfp');
+  const [isTimelineView, setIsTimelineView] = useState(false);
 
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Edit/Delete States
+  const [isEditWfpOpen, setIsEditWfpOpen] = useState(false);
+  const [activityToEdit, setActivityToEdit] = useState(null);
+  const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState(null);
+
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState(null);
 
   // Sidebar States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -72,6 +101,191 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  const loadData = async (showToastOnLoad = false) => {
+    try {
+      let hasData = false;
+
+      const wfp = await fetchWfpData();
+      if (wfp && wfp.length > 0) {
+        setWfpData(wfp);
+        setWfpFileName('Database_WFP_Data');
+        hasData = true;
+      }
+
+      const budget = await fetchBudgetData();
+      if (budget && (budget.transactions?.length > 0 || budget.summary?.allCurrent?.length > 0)) {
+        setBudgetSummary(budget.summary);
+        setBudgetTransactions(budget.transactions);
+        setRegionalTransfers(budget.regionalTransfers || []);
+        setBudgetFileName('Database_Budget_Data');
+        hasData = true;
+      }
+
+      if (hasData && showToastOnLoad) {
+        setActiveTab('dashboard');
+        triggerToast("Loaded data from database!");
+      }
+
+      try {
+        const usersResponse = await fetchUsers();
+        setUsersData(usersResponse);
+      } catch (e) {
+        console.error("Failed to load users:", e);
+      }
+    } catch (err) {
+      console.error("Failed to load data from DB:", err);
+    }
+  };
+
+  // Fetch data from backend on mount
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadData(true);
+  }, [isAuthenticated]);
+
+  // Edit/Delete Handlers
+  const openAddWfp = () => {
+    setActivityToEdit({});
+    setIsEditWfpOpen(true);
+  };
+
+  const openEditWfp = (activity) => {
+    setActivityToEdit(activity ? { ...activity } : {});
+    setIsEditWfpOpen(true);
+  };
+
+  const handleSaveWfpEdit = async (updatedData) => {
+    try {
+      if (updatedData._id) {
+        await updateWfpActivity(updatedData._id, updatedData);
+        triggerToast("Activity updated successfully!");
+      } else {
+        await addWfpActivity(updatedData);
+        triggerToast("Activity added successfully!");
+      }
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to save activity");
+    }
+  };
+
+  const handleDeleteWfp = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this activity?")) return;
+    try {
+      await deleteWfpActivity(id);
+      triggerToast("Activity deleted successfully!");
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to delete activity");
+    }
+  };
+
+  const openAddTransaction = () => {
+    setTransactionToEdit({});
+    setIsEditTransactionOpen(true);
+  };
+
+  const openEditTransaction = (transaction) => {
+    setTransactionToEdit(transaction ? { ...transaction } : {});
+    setIsEditTransactionOpen(true);
+  };
+
+  const handleSaveTransactionEdit = async (updatedData) => {
+    try {
+      if (updatedData._id) {
+        await updateBudgetTransaction(updatedData._id, updatedData);
+        triggerToast("Transaction updated successfully!");
+      } else {
+        await addBudgetTransaction(updatedData);
+        triggerToast("Transaction added successfully!");
+      }
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to save transaction");
+    }
+  };
+
+  const handleDeleteTransaction = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+    try {
+      await deleteBudgetTransaction(id);
+      triggerToast("Transaction deleted successfully!");
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to delete transaction");
+    }
+  };
+
+  const openAddUser = () => {
+    setUserToEdit({});
+    setIsUserModalOpen(true);
+  };
+
+  const openEditUser = (u) => {
+    setUserToEdit(u);
+    setIsUserModalOpen(true);
+  };
+
+  const handleSaveUserEdit = async (updatedData) => {
+    try {
+      if (updatedData._id) {
+        await updateUser(updatedData._id, updatedData);
+        triggerToast("User updated successfully!");
+      } else {
+        await addUser(updatedData);
+        triggerToast("User added successfully!");
+      }
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast(err.message || "Failed to save user");
+      throw err; // So UserModal can catch it
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await deleteUser(id);
+      triggerToast("User deleted successfully!");
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to delete user");
+    }
+  };
+
+  const handleSaveWfpToDb = async () => {
+    try {
+      if (wfpData.length === 0) return;
+      await saveWfpData(wfpData);
+      triggerToast("WFP Data saved to database successfully!");
+    } catch (err) {
+      triggerToast("Failed to save WFP data to database.");
+      console.error(err);
+    }
+  };
+
+  const handleSaveBudgetToDb = async () => {
+    try {
+      if (!budgetSummary || budgetTransactions.length === 0) return;
+      const payload = {
+        summary: budgetSummary,
+        transactions: budgetTransactions,
+        regionalTransfers: regionalTransfers
+      };
+      await saveBudgetData(payload);
+      triggerToast("Budget Data saved to database successfully!");
+    } catch (err) {
+      triggerToast("Failed to save Budget data to database.");
+      console.error(err);
+    }
+  };
 
   // Filters State (Affects charts and tables simultaneously!)
   const [filters, setFilters] = useState({
@@ -106,17 +320,7 @@ function App() {
     triggerToast(`Successfully parsed Budget Utilization data from ${name}`);
   };
 
-  // Automatically navigate to dashboard when BOTH files are uploaded
-  useEffect(() => {
-    if (wfpFileName && budgetFileName && activeTab === 'uploader') {
-      const timer = setTimeout(() => {
-        setDashboardTab('wfp');
-        setActiveTab('dashboard');
-        triggerToast("Both files loaded! Generating comprehensive dashboard...");
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [wfpFileName, budgetFileName, activeTab]);
+
 
   // Load both demo datasets
   const handleLoadAllDemo = () => {
@@ -177,14 +381,14 @@ function App() {
           const factor = 0.7 + (yrIndex * 0.05);
           const obAmt = Math.round(t.obligationAmount * factor * 100) / 100;
           const disbAmt = tIdx % 7 === 0 ? 0 : Math.round(t.disbursementAmount * factor * 100) / 100;
-          
+
           let obDate = '';
           if (t.obligationDate) {
             obDate = t.obligationDate.replace('2026', y);
           } else {
             obDate = `Feb 15, ${y}`;
           }
-          
+
           let disDate = '';
           if (t.disbursementDate) {
             disDate = t.disbursementDate.replace('2026', y);
@@ -219,7 +423,7 @@ function App() {
       'CHEDRO-XI', 'CHEDRO-XII', 'CHEDRO-CAR', 'CHEDRO-CARAGA', 'CHEDRO-NCR'
     ];
     const paps = ['BICPPHE', 'IT', 'HEDF', 'MSRS', 'PSG DEV\'T', 'STEEGS', 'LUDIP'];
-    
+
     let transferId = 1;
     for (const year of ['2025', '2026']) {
       regions.forEach((region, rIdx) => {
@@ -230,7 +434,7 @@ function App() {
             const obligation = allocation * 0.9;
             const disbursement = obligation * 0.85;
             const transferFrom = status === 'Continuing' ? allocation : 0;
-            
+
             mockRegionalTransfers.push({
               id: `demo-ro-${transferId++}`,
               year: year,
@@ -251,9 +455,7 @@ function App() {
 
     setBudgetFileName('Demo_IAS_Budget_Utilization.xlsx');
     setFilters({ quarter: '', month: '', projectProgram: '', objectOfExpenditure: '', search: '' });
-    setDashboardTab('wfp');
-    setActiveTab('dashboard');
-    triggerToast("Loaded WFP and Budget Utilization demo datasets!");
+    triggerToast("Loaded demo datasets! Don't forget to save to the database.");
   };
 
   const uniqueMonths = useMemo(() => {
@@ -351,6 +553,19 @@ function App() {
       .sort((a, b) => b.totalBudget - a.totalBudget)
       .slice(0, 5);
   }, [filteredData]);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('ias_user');
+    setUser(null);
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div className="flex h-screen app-bg font-sans overflow-hidden relative transition-colors duration-300">
@@ -471,30 +686,121 @@ function App() {
               )}
             </button>
 
+            {user?.role === 'ADMIN' && (
+              <button
+                onClick={() => {
+                  setActiveTab('uploader');
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex items-center w-full py-3 text-xs font-semibold rounded-xl transition-all group relative overflow-hidden
+                ${isSidebarCollapsed ? 'md:justify-center md:px-0 hover:scale-[1.03]' : 'px-4 gap-3 hover:pl-5'}
+                ${activeTab === 'uploader'
+                    ? 'bg-gradient-to-r from-gov-blue to-gov-blue-accent/90 text-white shadow-[0_4px_12px_rgba(0,56,168,0.25)]'
+                    : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-100'
+                  }
+              `}
+              >
+                {activeTab === 'uploader' && (
+                  <span className="absolute left-1.5 top-3 bottom-3 w-1 bg-gov-gold rounded-full shadow-[0_0_8px_rgba(255,199,44,0.8)]" />
+                )}
+                <UploadCloud size={16} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                <span className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:pointer-events-none' : 'opacity-100'} whitespace-nowrap`}>
+                  Upload Excel Files
+                </span>
+                {/* Tooltip for collapsed mode */}
+                {isSidebarCollapsed && (
+                  <div className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700 text-white text-[11px] font-bold rounded-lg opacity-0 pointer-events-none translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-xl z-50">
+                    Upload Excel Files
+                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45"></div>
+                  </div>
+                )}
+              </button>
+            )}
+
+            {user?.role === 'ADMIN' && (
+              <button
+                onClick={() => {
+                  setActiveTab('users');
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex items-center w-full py-3 text-xs font-semibold rounded-xl transition-all group relative overflow-hidden mt-6
+                ${isSidebarCollapsed ? 'md:justify-center md:px-0 hover:scale-[1.03]' : 'px-4 gap-3 hover:pl-5'}
+                ${activeTab === 'users'
+                    ? 'bg-gradient-to-r from-gov-blue to-gov-blue-accent/90 text-white shadow-[0_4px_12px_rgba(0,56,168,0.25)]'
+                    : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-100'
+                  }
+              `}
+              >
+                {activeTab === 'users' && (
+                  <span className="absolute left-1.5 top-3 bottom-3 w-1 bg-gov-gold rounded-full shadow-[0_0_8px_rgba(255,199,44,0.8)]" />
+                )}
+                <Users size={16} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                <span className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:pointer-events-none' : 'opacity-100'} whitespace-nowrap`}>
+                  User Management
+                </span>
+                {/* Tooltip for collapsed mode */}
+                {isSidebarCollapsed && (
+                  <div className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700 text-white text-[11px] font-bold rounded-lg opacity-0 pointer-events-none translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-xl z-50">
+                    User Management
+                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45"></div>
+                  </div>
+                )}
+              </button>
+            )}
+
+            {user?.role === 'ADMIN' && (
+              <button
+                onClick={() => {
+                  setActiveTab('audit');
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex items-center w-full py-3 text-xs font-semibold rounded-xl transition-all group relative overflow-hidden mt-2
+                ${isSidebarCollapsed ? 'md:justify-center md:px-0 hover:scale-[1.03]' : 'px-4 gap-3 hover:pl-5'}
+                ${activeTab === 'audit'
+                    ? 'bg-gradient-to-r from-gov-blue to-gov-blue-accent/90 text-white shadow-[0_4px_12px_rgba(0,56,168,0.25)]'
+                    : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-100'
+                  }
+              `}
+              >
+                {activeTab === 'audit' && (
+                  <span className="absolute left-1.5 top-3 bottom-3 w-1 bg-gov-gold rounded-full shadow-[0_0_8px_rgba(255,199,44,0.8)]" />
+                )}
+                <Database size={16} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                <span className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:pointer-events-none' : 'opacity-100'} whitespace-nowrap`}>
+                  System Audit Logs
+                </span>
+                {isSidebarCollapsed && (
+                  <div className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700 text-white text-[11px] font-bold rounded-lg opacity-0 pointer-events-none translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-xl z-50">
+                    System Audit Logs
+                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45"></div>
+                  </div>
+                )}
+              </button>
+            )}
+
             <button
               onClick={() => {
-                setActiveTab('uploader');
+                setActiveTab('profile');
                 setIsMobileSidebarOpen(false);
               }}
               className={`flex items-center w-full py-3 text-xs font-semibold rounded-xl transition-all group relative overflow-hidden
                 ${isSidebarCollapsed ? 'md:justify-center md:px-0 hover:scale-[1.03]' : 'px-4 gap-3 hover:pl-5'}
-                ${activeTab === 'uploader'
+                ${activeTab === 'profile'
                   ? 'bg-gradient-to-r from-gov-blue to-gov-blue-accent/90 text-white shadow-[0_4px_12px_rgba(0,56,168,0.25)]'
                   : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-100'
                 }
               `}
             >
-              {activeTab === 'uploader' && (
+              {activeTab === 'profile' && (
                 <span className="absolute left-1.5 top-3 bottom-3 w-1 bg-gov-gold rounded-full shadow-[0_0_8px_rgba(255,199,44,0.8)]" />
               )}
-              <UploadCloud size={16} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+              <Users size={16} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:pointer-events-none' : 'opacity-100'} whitespace-nowrap`}>
-                Upload Excel Files
+                My Profile
               </span>
-              {/* Tooltip for collapsed mode */}
               {isSidebarCollapsed && (
                 <div className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700 text-white text-[11px] font-bold rounded-lg opacity-0 pointer-events-none translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-xl z-50">
-                  Upload Excel Files
+                  My Profile
                   <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45"></div>
                 </div>
               )}
@@ -553,6 +859,14 @@ function App() {
                   Load Both Demo Datasets
                 </button>
               )}
+
+              <button
+                onClick={handleLogout}
+                className="w-full py-2 flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/60 text-red-400 hover:text-red-300 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer border border-red-900/50"
+              >
+                <LogOut size={14} />
+                {!isSidebarCollapsed && <span>Logout</span>}
+              </button>
 
               <div className="text-[9px] text-slate-600 text-center pt-1">
                 CHED International Affairs Service &copy; 2026
@@ -754,7 +1068,7 @@ function App() {
                   {/* 1. Charts Grid */}
                   <div className="space-y-6">
                     <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 pb-2">Analytics & Summary Visualizations</h3>
-                    <DashboardCharts data={filteredData} isDarkMode={isDarkMode} />
+                    <DashboardCharts data={filteredData} budgetData={budgetTransactions} isDarkMode={isDarkMode} />
                   </div>
 
                   {/* 1. Recent / Top Activities Quick Table */}
@@ -784,9 +1098,9 @@ function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y table-divide text-xs">
-                          {topActivitiesForDashboard.map((row) => (
+                          {topActivitiesForDashboard.map((row, index) => (
                             <tr
-                              key={row.id}
+                              key={row._id || index}
                               className="table-row-hover cursor-pointer transition-all"
                               onClick={() => setSelectedActivity(row)}
                               title="Click to view details"
@@ -844,17 +1158,46 @@ function App() {
               </div>
 
               {checklistTab === 'wfp' && wfpData.length > 0 && (
-                <div className="animate-fade-in">
-                  <ActivityTable
-                    data={filteredData}
-                    originalDataLength={wfpData.length}
-                    filters={filters}
-                    setFilters={setFilters}
-                    uniqueMonths={uniqueMonths}
-                    uniquePrograms={uniquePrograms}
-                    uniqueExpenses={uniqueExpenses}
-                    onViewActivity={setSelectedActivity}
-                  />
+                <div className="animate-fade-in space-y-4">
+                  <div className="flex justify-end no-print">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                      <button
+                        onClick={() => setIsTimelineView(false)}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${!isTimelineView ? 'bg-white dark:bg-slate-700 text-gov-blue dark:text-gov-blue-accent shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                      >
+                        Table View
+                      </button>
+                      <button
+                        onClick={() => setIsTimelineView(true)}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${isTimelineView ? 'bg-white dark:bg-slate-700 text-gov-blue dark:text-gov-blue-accent shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                      >
+                        Timeline Board
+                      </button>
+                    </div>
+                  </div>
+
+                  {isTimelineView ? (
+                    <MonthlyTimeline 
+                      activities={filteredData}
+                      onEditActivity={openEditWfp}
+                      isDarkMode={isDarkMode}
+                    />
+                  ) : (
+                    <ActivityTable
+                      data={filteredData}
+                      originalDataLength={wfpData.length}
+                      filters={filters}
+                      setFilters={setFilters}
+                      uniqueMonths={uniqueMonths}
+                      uniquePrograms={uniquePrograms}
+                      uniqueExpenses={uniqueExpenses}
+                      onViewActivity={setSelectedActivity}
+                      onEditActivity={openEditWfp}
+                      onDeleteActivity={handleDeleteWfp}
+                      onAddActivity={openAddWfp}
+                      userRole={user?.role}
+                    />
+                  )}
                 </div>
               )}
 
@@ -863,6 +1206,10 @@ function App() {
                   <TransactionLedger
                     transactions={budgetTransactions}
                     isDarkMode={isDarkMode}
+                    onEditTransaction={openEditTransaction}
+                    onDeleteTransaction={handleDeleteTransaction}
+                    onAddTransaction={openAddTransaction}
+                    userRole={user?.role}
                   />
                 </div>
               )}
@@ -888,7 +1235,35 @@ function App() {
                 budgetFileName={budgetFileName}
                 wfpCount={wfpData.length}
                 budgetCount={budgetTransactions.length}
+                onSaveWfpToDb={handleSaveWfpToDb}
+                onSaveBudgetToDb={handleSaveBudgetToDb}
               />
+            </div>
+          )}
+
+          {/* TAB 4: USER MANAGEMENT PAGE */}
+          {activeTab === 'users' && (
+            <div className="py-6 animate-fade-in">
+              <UserManagement
+                users={usersData}
+                onAddUser={openAddUser}
+                onEditUser={openEditUser}
+                onDeleteUser={handleDeleteUser}
+              />
+            </div>
+          )}
+
+          {/* TAB 5: AUDIT LOGS PAGE */}
+          {activeTab === 'audit' && user?.role === 'ADMIN' && (
+            <div className="py-6 animate-fade-in">
+              <AuditLogs />
+            </div>
+          )}
+
+          {/* TAB 6: PROFILE PAGE */}
+          {activeTab === 'profile' && (
+            <div className="py-6 animate-fade-in">
+              <UserProfile user={user} setUser={setUser} />
             </div>
           )}
         </div>
@@ -1021,6 +1396,27 @@ function App() {
           </div>
         </div>
       )}
+
+      <EditWfpModal
+        isOpen={isEditWfpOpen}
+        activity={activityToEdit}
+        onClose={() => setIsEditWfpOpen(false)}
+        onSave={handleSaveWfpEdit}
+      />
+
+      <EditTransactionModal
+        isOpen={isEditTransactionOpen}
+        transaction={transactionToEdit}
+        onClose={() => setIsEditTransactionOpen(false)}
+        onSave={handleSaveTransactionEdit}
+      />
+
+      <UserModal
+        isOpen={isUserModalOpen}
+        user={userToEdit}
+        onClose={() => setIsUserModalOpen(false)}
+        onSave={handleSaveUserEdit}
+      />
     </div>
   );
 }

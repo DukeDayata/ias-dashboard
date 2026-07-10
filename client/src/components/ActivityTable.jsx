@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronUp, ChevronDown, Download, Printer, Search, RefreshCw, Eye } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, Printer, Search, RefreshCw, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { formatCurrency, formatNumber, getMonthQuarter } from '../utils/formatters';
 import * as XLSX from 'xlsx';
 
-export const ActivityTable = ({ data, originalDataLength, filters, setFilters, uniqueMonths, uniquePrograms, uniqueExpenses, onViewActivity }) => {
+export const ActivityTable = ({ data, originalDataLength, filters, setFilters, uniqueMonths, uniquePrograms, uniqueExpenses, onViewActivity, onEditActivity, onDeleteActivity, onAddActivity, userRole }) => {
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -174,14 +174,24 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
             <Search size={16} className="text-gov-blue dark:text-gov-blue-accent" />
             Filter Activities
           </h4>
-          {(filters.quarter || filters.month || filters.projectProgram || filters.objectOfExpenditure || filters.search) && (
-            <button
-              onClick={handleResetFilters}
-              className="flex items-center gap-1 text-[11px] font-bold text-gov-red dark:text-red-400 hover:underline"
-            >
-              <RefreshCw size={10} /> Reset Filters
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {(filters.quarter || filters.month || filters.projectProgram || filters.objectOfExpenditure || filters.search) && (
+              <button
+                onClick={handleResetFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-gov-red dark:text-red-400 hover:underline"
+              >
+                <RefreshCw size={10} /> Reset Filters
+              </button>
+            )}
+            {userRole === 'ADMIN' && (
+              <button
+                onClick={onAddActivity}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gov-blue hover:bg-gov-blue-dark text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+              >
+                <Plus size={14} /> Add Activity
+              </button>
+            )}
+          </div>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -331,9 +341,9 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
               {currentRows.length > 0 ? (
-                currentRows.map((row) => (
+                currentRows.map((row, index) => (
                   <tr 
-                    key={row.id} 
+                    key={row._id || row.id || `activity-${index}`} 
                     className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
                     onClick={() => onViewActivity(row)}
                   >
@@ -353,7 +363,7 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
                     <td className="hidden xl:table-cell px-5 py-4 text-slate-400 dark:text-slate-500 italic max-w-[200px] truncate" title={row.remarks}>
                       {row.remarks || "No description"}
                     </td>
-                    <td className="px-5 py-4 text-center whitespace-nowrap no-print" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-5 py-4 text-center whitespace-nowrap no-print flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button 
                         onClick={() => onViewActivity(row)}
                         className="p-1.5 text-gov-blue dark:text-gov-blue-accent hover:text-gov-blue-dark dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
@@ -361,6 +371,24 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
                       >
                         <Eye size={16} />
                       </button>
+                      {userRole === 'ADMIN' && (
+                        <>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onEditActivity(row); }}
+                            className="p-1.5 text-slate-500 hover:text-gov-blue dark:hover:text-gov-blue-accent hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                            title="Edit Activity"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteActivity(row._id); }}
+                            className="p-1.5 text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                            title="Delete Activity"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))
