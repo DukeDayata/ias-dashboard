@@ -34,9 +34,15 @@ const connectDB = async () => {
     }
 
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log("Successfully connected to Remote MongoDB");
+    if (process.env.MONGODB_URI.includes('ondigitalocean')) {
+      console.log("Successfully connected to DigitalOcean MongoDB");
+    } else if (process.env.MONGODB_URI.includes('localhost')) {
+      console.log("Successfully connected to Local MongoDB");
+    } else {
+      console.log("Successfully connected to MongoDB");
+    }
   } catch (error) {
-    console.error(`Failed to connect to Remote MongoDB (${error.message}).`);
+    console.error(`Failed to connect to MongoDB (${error.message}).`);
     process.exit(1);
   }
 
