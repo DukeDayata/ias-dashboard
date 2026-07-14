@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User as UserIcon, Lock, Mail, Shield } from 'lucide-react';
+import { Save, User as UserIcon, Lock, Mail, Shield, Eye, EyeOff } from 'lucide-react';
 import { fetchProfile, updateProfile } from '../services/api';
 
 export const UserProfile = ({ user, setUser }) => {
@@ -7,6 +7,8 @@ export const UserProfile = ({ user, setUser }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -136,25 +138,43 @@ export const UserProfile = ({ user, setUser }) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">New Password</label>
-                <input 
-                  type="password" 
-                  name="password" 
-                  value={formData.password} 
-                  onChange={handleChange} 
-                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue dark:text-white transition-all shadow-sm"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    name="password" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue dark:text-white transition-all shadow-sm pr-10"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">Confirm Password</label>
-                <input 
-                  type="password" 
-                  name="confirmPassword" 
-                  value={formData.confirmPassword} 
-                  onChange={handleChange} 
-                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue dark:text-white transition-all shadow-sm"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    name="confirmPassword" 
+                    value={formData.confirmPassword} 
+                    onChange={handleChange} 
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue dark:text-white transition-all shadow-sm pr-10"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

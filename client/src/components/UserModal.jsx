@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Eye, EyeOff } from 'lucide-react';
 
 export const UserModal = ({ isOpen, user, onClose, onSave }) => {
   const [formData, setFormData] = useState({ name: '', email: '', role: 'VIEWER', password: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (user && user._id) {
@@ -77,15 +78,24 @@ export const UserModal = ({ isOpen, user, onClose, onSave }) => {
               <label className="text-xs font-bold text-slate-500 uppercase">
                 {user?._id ? 'New Password (Optional)' : 'Password'}
               </label>
-              <input 
-                required={!user?._id} 
-                type="password" 
-                name="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                placeholder={user?._id ? 'Leave blank to keep current password' : 'Enter password'}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-gov-blue dark:text-white placeholder-slate-400" 
-              />
+              <div className="relative">
+                <input 
+                  required={!user?._id} 
+                  type={showPassword ? "text" : "password"} 
+                  name="password" 
+                  value={formData.password} 
+                  onChange={handleChange} 
+                  placeholder={user?._id ? 'Leave blank to keep current password' : 'Enter password'}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-gov-blue dark:text-white placeholder-slate-400 pr-10" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </form>
         </div>
