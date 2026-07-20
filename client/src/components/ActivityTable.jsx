@@ -3,7 +3,7 @@ import { ChevronUp, ChevronDown, Download, Printer, Search, RefreshCw, Eye, Edit
 import { formatCurrency, formatNumber, getMonthQuarter } from '../utils/formatters';
 import * as XLSX from 'xlsx';
 
-export const ActivityTable = ({ data, originalDataLength, filters, setFilters, uniqueMonths, uniquePrograms, uniqueExpenses, onViewActivity, onEditActivity, onDeleteActivity, onAddActivity, userRole }) => {
+export const ActivityTable = ({ data, originalDataLength, filters, setFilters, uniqueMonths, uniqueActivities, uniqueExpenses, onViewActivity, onEditActivity, onDeleteActivity, onAddActivity, userRole }) => {
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -158,7 +158,7 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
     setFilters({
       quarter: '',
       month: '',
-      projectProgram: '',
+      activityTitle: '',
       objectOfExpenditure: '',
       search: ''
     });
@@ -175,7 +175,7 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
             Filter Activities
           </h4>
           <div className="flex items-center gap-4">
-            {(filters.quarter || filters.month || filters.projectProgram || filters.objectOfExpenditure || filters.search) && (
+            {(filters.quarter || filters.month || filters.activityTitle || filters.objectOfExpenditure || filters.search) && (
               <button
                 onClick={handleResetFilters}
                 className="flex items-center gap-1 text-[11px] font-bold text-gov-red dark:text-red-400 hover:underline"
@@ -249,16 +249,16 @@ export const ActivityTable = ({ data, originalDataLength, filters, setFilters, u
             </select>
           </div>
 
-          {/* Project Selector */}
+          {/* Activity Selector */}
           <div className="flex flex-col space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Project / Program</label>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Activity</label>
             <select
-              value={filters.projectProgram}
-              onChange={(e) => { setFilters(prev => ({ ...prev, projectProgram: e.target.value })); setCurrentPage(1); }}
-              className="px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:border-gov-blue dark:focus:border-gov-blue-accent outline-none transition-all"
+              value={filters.activityTitle}
+              onChange={(e) => { setFilters(prev => ({ ...prev, activityTitle: e.target.value })); setCurrentPage(1); }}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:border-gov-blue dark:focus:border-gov-blue-accent outline-none transition-all max-w-[200px]"
             >
-              <option value="">All Projects</option>
-              {uniquePrograms.map(p => <option key={p} value={p}>{p}</option>)}
+              <option value="">All Activities</option>
+              {uniqueActivities.map(a => <option key={a} value={a} title={a}>{a.length > 30 ? a.substring(0, 30) + '...' : a}</option>)}
             </select>
           </div>
 

@@ -291,7 +291,7 @@ function App() {
   const [filters, setFilters] = useState({
     quarter: '',
     month: '',
-    projectProgram: '',
+    activityTitle: '',
     objectOfExpenditure: '',
     search: ''
   });
@@ -307,7 +307,7 @@ function App() {
   const handleWfpParsed = (data, name) => {
     setWfpData(data);
     setWfpFileName(name);
-    setFilters({ quarter: '', month: '', projectProgram: '', objectOfExpenditure: '', search: '' });
+    setFilters({ quarter: '', month: '', activityTitle: '', objectOfExpenditure: '', search: '' });
     triggerToast(`Successfully parsed ${data.length} WFP activities from ${name}`);
   };
 
@@ -454,7 +454,7 @@ function App() {
     setRegionalTransfers(mockRegionalTransfers);
 
     setBudgetFileName('Demo_IAS_Budget_Utilization.xlsx');
-    setFilters({ quarter: '', month: '', projectProgram: '', objectOfExpenditure: '', search: '' });
+    setFilters({ quarter: '', month: '', activityTitle: '', objectOfExpenditure: '', search: '' });
     triggerToast("Loaded demo datasets! Don't forget to save to the database.");
   };
 
@@ -487,9 +487,9 @@ function App() {
     return uniqueRawMonths.sort((a, b) => getMonthOrderScore(a) - getMonthOrderScore(b));
   }, [wfpData]);
 
-  const uniquePrograms = useMemo(() => {
-    const programs = wfpData.map(item => item.projectProgram);
-    return [...new Set(programs)].sort();
+  const uniqueActivities = useMemo(() => {
+    const activities = wfpData.map(item => item.activity);
+    return [...new Set(activities)].sort();
   }, [wfpData]);
 
   const uniqueExpenses = useMemo(() => {
@@ -497,12 +497,11 @@ function App() {
     return [...new Set(expenses)].sort();
   }, [wfpData]);
 
-  // Apply filters to data
   const filteredData = useMemo(() => {
     return wfpData.filter(item => {
       const matchQuarter = !filters.quarter || getMonthQuarter(item.month) === filters.quarter;
       const matchMonth = !filters.month || item.month === filters.month;
-      const matchProgram = !filters.projectProgram || item.projectProgram === filters.projectProgram;
+      const matchActivity = !filters.activityTitle || item.activity === filters.activityTitle;
       const matchExpense = !filters.objectOfExpenditure || item.objectOfExpenditure === filters.objectOfExpenditure;
 
       const searchNorm = normalizeString(filters.search);
@@ -512,7 +511,7 @@ function App() {
         normalizeString(item.objectOfExpenditure).includes(searchNorm) ||
         normalizeString(item.remarks).includes(searchNorm);
 
-      return matchQuarter && matchMonth && matchProgram && matchExpense && matchSearch;
+      return matchQuarter && matchMonth && matchActivity && matchExpense && matchSearch;
     });
   }, [wfpData, filters]);
 
@@ -1001,7 +1000,7 @@ function App() {
                   </div>
 
                   {/* Dynamic Filter Badges Notification */}
-                  {(filters.quarter || filters.month || filters.projectProgram || filters.objectOfExpenditure || filters.search) && (
+                  {(filters.quarter || filters.month || filters.activityTitle || filters.objectOfExpenditure || filters.search) && (
                     <div className="p-3.5 bg-gov-gold-light dark:bg-slate-900/50 border border-gov-gold/20 dark:border-slate-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700 dark:text-slate-300 no-print">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-800 dark:text-slate-200">Active Filters Dashboard:</span>
@@ -1016,11 +1015,11 @@ function App() {
                           </span>
                         )}
                         {filters.month && <span className="bg-white dark:bg-slate-800 border dark:border-slate-700 px-2 py-0.5 rounded font-medium">Month: {filters.month}</span>}
-                        {filters.projectProgram && <span className="bg-white dark:bg-slate-800 border dark:border-slate-700 px-2 py-0.5 rounded font-medium">Program: {filters.projectProgram}</span>}
+                        {filters.activityTitle && <span className="bg-white dark:bg-slate-800 border dark:border-slate-700 px-2 py-0.5 rounded font-medium">Activity: {filters.activityTitle}</span>}
                         {filters.objectOfExpenditure && <span className="bg-white dark:bg-slate-800 border dark:border-slate-700 px-2 py-0.5 rounded font-medium">Expense Class: {filters.objectOfExpenditure}</span>}
                       </div>
                       <button
-                        onClick={() => setFilters({ quarter: '', month: '', projectProgram: '', objectOfExpenditure: '', search: '' })}
+                        onClick={() => setFilters({ quarter: '', month: '', activityTitle: '', objectOfExpenditure: '', search: '' })}
                         className="font-bold text-gov-blue dark:text-gov-blue-accent hover:underline text-[11px]"
                       >
                         Clear All Filters
@@ -1189,7 +1188,7 @@ function App() {
                       filters={filters}
                       setFilters={setFilters}
                       uniqueMonths={uniqueMonths}
-                      uniquePrograms={uniquePrograms}
+                      uniqueActivities={uniqueActivities}
                       uniqueExpenses={uniqueExpenses}
                       onViewActivity={setSelectedActivity}
                       onEditActivity={openEditWfp}
